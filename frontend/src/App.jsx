@@ -4,6 +4,8 @@ import LeftColumn from './components/LeftColumn';
 import RightColumn from './components/RightColumn';
 import CenterColumn from './components/CenterColumn';
 
+const MAX_LEDGER_ENTRIES = 25;
+
 function App() {
   const [systemState, setSystemState] = useState("HEALTHY");
   const [ledger, setLedger] = useState([]);
@@ -21,7 +23,7 @@ function App() {
         const payload = JSON.parse(event.data);
         switch (payload.type) {
           case 'ledger_entry':
-            setLedger((prev) => [...prev, payload]);
+            setLedger((prev) => [payload, ...prev].slice(0, MAX_LEDGER_ENTRIES));
             setTotalCost((prev) => prev + (payload.cost || 0));
             break;
           case 'system_state':
@@ -71,11 +73,15 @@ function App() {
   }, []);
 
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: 'minmax(300px, 1fr) 400px minmax(300px, 1fr)', gap: '20px', height: '100vh' }}>
-      <LeftColumn systemState={systemState} pulseData={pulseData} recentRecords={recentRecords} />
+    <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)', gap: '20px', minHeight: '100vh' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '20px', alignContent: 'start' }}>
+        <LeftColumn systemState={systemState} pulseData={pulseData} recentRecords={recentRecords} />
+      </div>
 
-      <CenterColumn agents={agents} systemState={systemState} />
-      <RightColumn systemState={systemState} totalCost={totalCost} ledger={ledger} />
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '20px', alignContent: 'start' }}>
+        <CenterColumn agents={agents} systemState={systemState} />
+        <RightColumn systemState={systemState} totalCost={totalCost} ledger={ledger} />
+      </div>
     </div>
   );
 }

@@ -22,7 +22,14 @@ function RightColumn({ systemState, totalCost, ledger }) {
 
       <div>
         <h3 style={{ marginTop: 0 }}>Transaction Feed</h3>
-        <div style={{ display: 'grid', gap: '8px' }}>
+        <div
+          style={{
+            display: 'grid',
+            gap: '8px',
+            maxHeight: 'calc(100vh - 520px)',
+            overflow: 'hidden',
+          }}
+        >
           {ledger.map((tx, i) => (
             <div
               key={`${tx.agent}-${i}-${tx.description}`}
