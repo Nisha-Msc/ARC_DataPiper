@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import './App.css';
 import LeftColumn from './components/LeftColumn';
 import RightColumn from './components/RightColumn';
@@ -11,6 +11,7 @@ function App() {
   const [agents, setAgents] = useState({ discovery: "IDLE", fixer: "IDLE", verifier: "IDLE" });
   const [pulseData, setPulseData] = useState([]);
   const [recentRecords, setRecentRecords] = useState([]);
+  const sawMetricsRef = useRef(false);
 
   useEffect(() => {
     const es = new EventSource('http://localhost:3001/api/stream');
@@ -29,9 +30,32 @@ function App() {
           case 'agent_status':
             setAgents((prev) => ({ ...prev, [payload.agent]: payload.status }));
             break;
+          case 'metrics':
+            sawMetricsRef.current = true;
+            setPulseData((prev) => {
+              const newData = [...prev, { time: payload.time, value: Number(payload.value) || 0 }];
+              return newData.slice(-20);
+            });
+            break;
           case 'heartbeat':
           case 'drift_detected':
             setRecentRecords((prev) => [payload, ...prev].slice(0, 10));
+            if (!sawMetricsRef.current) {
+              setPulseData((prev) => {
+                const eventDate = payload.timestamp ? new Date(payload.timestamp) : new Date();
+                const time = eventDate.toLocaleTimeString([], { hour12: false });
+                const data = [...prev];
+                const lastPoint = data[data.length - 1];
+
+                if (lastPoint && lastPoint.time === time) {
+                  data[data.length - 1] = { ...lastPoint, value: (Number(lastPoint.value) || 0) + 1 };
+                } else {
+                  data.push({ time, value: 1 });
+                }
+
+                return data.slice(-20);
+              });
+            }
             break;
           default:
             break;
