@@ -11,12 +11,12 @@
   "license": "ISC",
   "type": "commonjs",
   "dependencies": {
-    "@google/genai": "^1.50.1",
     "ajv": "^8.18.0",
     "cors": "^2.8.6",
     "dotenv": "^17.4.2",
     "express": "^5.2.1",
     "kafkajs": "^2.2.4",
+    "openai": "^4.85.4",
     "uuid": "^14.0.0"
   }
 }
