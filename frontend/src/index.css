@@ -1,0 +1,35 @@
+:root {
+  --bg-primary: #0a0e17;
+  --bg-card: #111827;
+  --bg-card-glow: #1a2332;
+  --green-pulse: #00ff88;
+  --red-alert: #ff2255;
+  --blue-agent: #38bdf8;
+  --yellow-healed: #fbbf24;
+  --text-primary: #f1f5f9;
+  --text-muted: #94a3b8;
+  --font-mono: 'JetBrains Mono', 'Fira Code', monospace;
+}
+
+body {
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+  font-family: system-ui, sans-serif;
+  margin: 0;
+  padding: 20px;
+}
+
+@keyframes glitch {
+  0% { transform: translate(0); filter: hue-rotate(0deg); }
+  20% { transform: translate(-2px, 2px); filter: hue-rotate(90deg); }
+  40% { transform: translate(2px, -2px); filter: hue-rotate(180deg); }
+  60% { transform: translate(-1px, -1px); filter: hue-rotate(270deg); }
+  80% { transform: translate(1px, 1px); filter: hue-rotate(360deg); }
+  100% { transform: translate(0); filter: hue-rotate(0deg); }
+}
+
+.record--broken {
+  animation: glitch 0.3s infinite;
+  border: 1px solid var(--red-alert);
+  box-shadow: 0 0 20px rgba(255, 34, 85, 0.4);
+}
