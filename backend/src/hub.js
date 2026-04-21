@@ -131,6 +131,14 @@ const updateAgentStatus = (agent, status) => {
   broadcast({ type: 'agent_status', agent, status });
 };
 
+const recordManualInterventionAlert = (reason) => {
+  recordCharge(
+    'ALERT',
+    0,
+    `Fixer patch failed verification. Manual intervention required. Reason: ${reason}`
+  );
+};
+
 const runHealingFlow = async (badPayload) => {
   isHealing = true;
   systemState = 'HEALING';
@@ -205,7 +213,11 @@ const runHealingFlow = async (badPayload) => {
 
     const verifyBody = await verifyRes.json().catch(() => ({}));
     if (!verifyRes.ok || !verifyBody.ok) {
-      throw new Error('Transformer rejected generated patch');
+      const verificationError = new Error(
+        verifyBody.error || 'Transformer rejected generated patch'
+      );
+      verificationError.code = 'VERIFICATION_REJECTED';
+      throw verificationError;
     }
 
     updateAgentStatus('verifier', 'DONE');
@@ -228,6 +240,11 @@ const runHealingFlow = async (badPayload) => {
   } catch (error) {
     console.error('Agent healing flow failed:', error.message);
     console.error('Full error:', error);
+
+    if (error.code === 'VERIFICATION_REJECTED') {
+      recordManualInterventionAlert(error.message);
+    }
+
     systemState = 'DEGRADED';
     broadcast({ type: 'system_state', state: systemState });
     throw error;

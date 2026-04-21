@@ -30,20 +30,27 @@ function RightColumn({ systemState, totalCost, ledger }) {
             overflow: 'hidden',
           }}
         >
-          {ledger.map((tx, i) => (
-            <div
-              key={`${tx.agent}-${i}-${tx.description}`}
-              style={{
-                fontFamily: 'var(--font-mono)',
-                color: 'var(--text-muted)',
-                fontSize: '0.88rem',
-                borderBottom: '1px dashed #1f2a3d',
-                paddingBottom: '6px',
-              }}
-            >
-              [{tx.agent}: ${tx.cost.toFixed(4)}] - {tx.description}
-            </div>
-          ))}
+          {ledger.map((tx, i) => {
+            const isManualAlert =
+              tx.agent === 'ALERT' ||
+              String(tx.description || '').includes('Manual intervention required');
+
+            return (
+              <div
+                key={`${tx.agent}-${i}-${tx.description}`}
+                style={{
+                  fontFamily: 'var(--font-mono)',
+                  color: isManualAlert ? 'var(--red-alert)' : 'var(--text-muted)',
+                  fontSize: '0.88rem',
+                  borderBottom: isManualAlert ? '1px solid var(--red-alert)' : '1px dashed #1f2a3d',
+                  paddingBottom: '6px',
+                  fontWeight: isManualAlert ? 700 : 400,
+                }}
+              >
+                [{tx.agent}: ${tx.cost.toFixed(4)}] - {tx.description}
+              </div>
+            );
+          })}
           {ledger.length === 0 && (
             <div style={{ fontFamily: 'var(--font-mono)', color: 'var(--text-muted)' }}>
               Waiting for transactions...
