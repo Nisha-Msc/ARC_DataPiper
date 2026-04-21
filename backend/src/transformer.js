@@ -33,6 +33,11 @@ app.post('/api/internal/update-logic', (req, res) => {
   }
 });
 
+app.post('/api/internal/reset-logic', (req, res) => {
+  currentLogic = (data) => data;
+  res.json({ ok: true, status: 'logic_reset' });
+});
+
 const producer = kafka.producer();
 const consumer = kafka.consumer({ groupId: 'transformer-gate' });
 
