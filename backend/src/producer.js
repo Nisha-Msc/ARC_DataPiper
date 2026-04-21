@@ -12,10 +12,18 @@ const producer = kafka.producer();
 
 // 2. The State & Chaos Hook
 let currentSchemaVersion = 'v1';
+let schemaIndex = 1;
 
 app.post('/api/producer/chaos', (req, res) => {
-    currentSchemaVersion = 'v2';
-    res.json({ status: "chaos_initiated", version: "v2" });
+    schemaIndex++;
+    if (schemaIndex > 5) schemaIndex = 2;
+    currentSchemaVersion = `v${schemaIndex}`;
+    res.json({ status: "chaos_initiated", version: currentSchemaVersion });
+});
+
+app.post('/api/producer/reset', (req, res) => {
+    currentSchemaVersion = 'v1';
+    res.json({ status: "reset", version: "v1" });
 });
 
 // 3. The Streaming Loop
@@ -34,13 +42,25 @@ async function start() {
                         id: uuidv4(),
                         total_price: parseFloat((Math.random() * 100).toFixed(2))
                     };
-                } else {
+                } else if (currentSchemaVersion === 'v2') {
                     payload = {
                         id: uuidv4(),
-                        price: {
-                            amount: parseFloat((Math.random() * 100).toFixed(2)),
-                            currency: "USD"
-                        }
+                        price: { amount: parseFloat((Math.random() * 100).toFixed(2)), currency: "USD" }
+                    };
+                } else if (currentSchemaVersion === 'v3') {
+                    payload = {
+                        orderId: uuidv4(),
+                        totalAmount: parseFloat((Math.random() * 100).toFixed(2))
+                    };
+                } else if (currentSchemaVersion === 'v4') {
+                    payload = {
+                        identifier: uuidv4(),
+                        cost: parseFloat((Math.random() * 100).toFixed(2))
+                    };
+                } else {
+                    payload = {
+                        txn_id: uuidv4(),
+                        value: parseFloat((Math.random() * 100).toFixed(2))
                     };
                 }
 
