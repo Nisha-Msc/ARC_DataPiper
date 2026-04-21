@@ -21,6 +21,7 @@ let isHealing = false;
 let lastKnownBadPayload = null;
 let pendingDlqCommit = null;
 let agentConsumerRef = null;
+let metrics = { processed: 0, errors: 0 };
 
 // 2. The SSE Broadcaster
 const broadcast = (eventObj) => {
@@ -75,12 +76,14 @@ app.post('/api/internal/charge', (req, res) => {
 
 app.post('/api/internal/heartbeat', (req, res) => {
   const { record } = req.body;
+  metrics.processed++;
   broadcast({ type: 'heartbeat', record, timestamp: new Date().toISOString() });
   res.json({ status: 'success' });
 });
 
 app.post('/api/internal/drift', (req, res) => {
   const { record, error } = req.body;
+  metrics.errors++;
   broadcast({ type: 'drift_detected', record, error, timestamp: new Date().toISOString() });
   res.json({ status: 'success' });
 });
@@ -144,11 +147,6 @@ const runHealingFlow = async (badPayload) => {
     updateAgentStatus('discovery', 'DONE');
 
     updateAgentStatus('fixer', 'PATCHING');
-    recordCharge(
-      'Fixer',
-      parseFloat(process.env.FIXER_BOUNTY || 0.0050),
-      'Generated mapping patch via Gemini 2.5 Flash'
-    );
 
     const baseURL = process.env.OPENAI_BASE_URL || 'https://api.openai.com/v1';
     console.log('[Fixer] Using baseURL:', baseURL);
@@ -168,6 +166,21 @@ const runHealingFlow = async (badPayload) => {
       messages: [{ role: 'user', content: prompt }]
     });
     console.log('[Fixer] Got response from LLM');
+
+    // Calculate actual real-life token cost (GPT-4o-mini: $0.150/1M input, $0.600/1M output)
+    let actualCost = parseFloat(process.env.FIXER_BOUNTY || 0.0050);
+    let tokenDesc = 'Generated patch via OpenAI';
+    if (response.usage) {
+      const pTokens = response.usage.prompt_tokens || 0;
+      const cTokens = response.usage.completion_tokens || 0;
+      actualCost = parseFloat(((pTokens * 0.150 / 1000000) + (cTokens * 0.600 / 1000000)).toFixed(6));
+      
+      // Ensure the cost is at least non-zero for UI visibility
+      actualCost = Math.max(actualCost, 0.0001); 
+      tokenDesc = `OpenAI API usage: ${response.usage.total_tokens} tokens utilized`;
+    }
+
+    recordCharge('Fixer', actualCost, tokenDesc);
 
     const responseText = response.choices[0].message.content || '';
     let code = String(responseText)
@@ -242,6 +255,43 @@ app.post('/api/internal/authorize-fix', async (req, res) => {
     return res.status(500).json({ status: 'error', message: error.message });
   }
 });
+
+app.post('/api/internal/reset-demo', async (req, res) => {
+  try {
+    lastKnownBadPayload = null;
+    isHealing = false;
+    pendingDlqCommit = null;
+
+    const [producerResetRes, transformerResetRes] = await Promise.all([
+      fetch('http://localhost:3003/api/producer/reset', { method: 'POST' }),
+      fetch('http://localhost:3002/api/internal/reset-logic', { method: 'POST' })
+    ]);
+
+    if (!producerResetRes.ok) {
+      throw new Error('Failed resetting producer schema version');
+    }
+    if (!transformerResetRes.ok) {
+      throw new Error('Failed resetting transformer logic');
+    }
+
+    systemState = 'HEALTHY';
+    updateAgentStatus('discovery', 'IDLE');
+    updateAgentStatus('fixer', 'IDLE');
+    updateAgentStatus('verifier', 'IDLE');
+    broadcast({ type: 'system_state', state: systemState });
+
+    return res.json({ status: 'success', state: systemState });
+  } catch (error) {
+    console.error('Failed to reset demo state:', error.message);
+    return res.status(500).json({ status: 'error', message: error.message });
+  }
+});
+
+setInterval(() => {
+  const time = new Date().toLocaleTimeString([], { hour12: false });
+  broadcast({ type: 'metrics', time, value: metrics.processed + metrics.errors });
+  metrics = { processed: 0, errors: 0 };
+}, 1000);
 
 const startHub = async () => {
   agentConsumerRef = kafka.consumer({ groupId: 'hub-agent' });
