@@ -9,6 +9,14 @@ function CenterColumn({ agents, systemState }) {
     }
   };
 
+  const authorizeFix = async () => {
+    try {
+      await fetch('http://localhost:3001/api/internal/authorize-fix', { method: 'POST' });
+    } catch (error) {
+      console.error('Failed to authorize recovery team', error);
+    }
+  };
+
   const cards = [
     { key: 'discovery', title: '🕵️ Discovery Agent' },
     { key: 'fixer', title: '🛠️ Fixer Agent' },
@@ -38,8 +46,29 @@ function CenterColumn({ agents, systemState }) {
           marginBottom: '18px',
         }}
       >
-        Simulate Upstream API Update
+        Chaos Monkey
       </button>
+
+      {systemState === 'BROKEN' && (
+        <button
+          onClick={authorizeFix}
+          style={{
+            width: '100%',
+            border: '1px solid #7a5d11',
+            borderRadius: '10px',
+            padding: '14px 16px',
+            fontSize: '0.98rem',
+            fontWeight: 800,
+            letterSpacing: '0.01em',
+            background: 'linear-gradient(135deg, #f0c75e 0%, #2fbf71 100%)',
+            color: '#0b1220',
+            cursor: 'pointer',
+            marginBottom: '18px',
+          }}
+        >
+          $ Hire Recovery Team (Bounty Authorization)
+        </button>
+      )}
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '12px' }}>
         {cards.map((card) => {

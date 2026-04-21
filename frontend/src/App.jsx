@@ -10,6 +10,7 @@ function App() {
   const [totalCost, setTotalCost] = useState(0);
   const [agents, setAgents] = useState({ discovery: "IDLE", fixer: "IDLE", verifier: "IDLE" });
   const [pulseData, setPulseData] = useState([]);
+  const [recentRecords, setRecentRecords] = useState([]);
 
   useEffect(() => {
     const es = new EventSource('http://localhost:3001/api/stream');
@@ -28,6 +29,10 @@ function App() {
           case 'agent_status':
             setAgents((prev) => ({ ...prev, [payload.agent]: payload.status }));
             break;
+          case 'heartbeat':
+          case 'drift_detected':
+            setRecentRecords((prev) => [payload, ...prev].slice(0, 10));
+            break;
           default:
             break;
         }
@@ -43,7 +48,7 @@ function App() {
 
   return (
     <div style={{ display: 'grid', gridTemplateColumns: 'minmax(300px, 1fr) 400px minmax(300px, 1fr)', gap: '20px', height: '100vh' }}>
-      <LeftColumn systemState={systemState} pulseData={pulseData} />
+      <LeftColumn systemState={systemState} pulseData={pulseData} recentRecords={recentRecords} />
 
       <CenterColumn agents={agents} systemState={systemState} />
       <RightColumn systemState={systemState} totalCost={totalCost} ledger={ledger} />

@@ -1,12 +1,6 @@
 import { AreaChart, Area, XAxis, YAxis, ResponsiveContainer } from 'recharts';
 
-const mockRecords = [
-  { type: 'order', id: 'ord_1001', amount: 41.6723, region: 'us-east-1' },
-  { type: 'order', id: 'ord_1002', amount: 12.1104, region: 'eu-west-1' },
-  { type: 'refund', id: 'ref_1003', amount: -5.4002, region: 'ap-south-1' },
-];
-
-function LeftColumn({ systemState, pulseData }) {
+function LeftColumn({ systemState, pulseData, recentRecords }) {
   const pulseColor = systemState === 'BROKEN' ? 'var(--red-alert)' : 'var(--green-pulse)';
 
   return (
@@ -46,9 +40,9 @@ function LeftColumn({ systemState, pulseData }) {
             minHeight: '140px',
           }}
         >
-          {mockRecords.map((record, index) => (
-            <div key={`${record.id}-${index}`}>
-              {JSON.stringify(record)}
+          {recentRecords.map((r, i) => (
+            <div key={i} className={r.type === 'drift_detected' ? 'record--broken' : ''}>
+              {JSON.stringify(r.record)}
             </div>
           ))}
         </div>
