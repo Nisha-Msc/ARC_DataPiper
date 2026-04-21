@@ -17,6 +17,14 @@ function CenterColumn({ agents, systemState }) {
     }
   };
 
+  const resetDemo = async () => {
+    try {
+      await fetch('http://localhost:3001/api/internal/reset-demo', { method: 'POST' });
+    } catch (error) {
+      console.error('Failed to reset demo', error);
+    }
+  };
+
   const cards = [
     { key: 'discovery', title: '🕵️ Discovery Agent' },
     { key: 'fixer', title: '🛠️ Fixer Agent' },
@@ -46,7 +54,26 @@ function CenterColumn({ agents, systemState }) {
           marginBottom: '18px',
         }}
       >
-        Chaos Monkey
+        Introduce Drift
+      </button>
+
+      <button
+        onClick={resetDemo}
+        style={{
+          width: '100%',
+          border: '1px solid #3b475f',
+          borderRadius: '10px',
+          padding: '12px 16px',
+          fontSize: '0.92rem',
+          fontWeight: 700,
+          letterSpacing: '0.01em',
+          background: '#0f1726',
+          color: '#b8c4d9',
+          cursor: 'pointer',
+          marginBottom: '18px',
+        }}
+      >
+        Reset Demo
       </button>
 
       {systemState === 'BROKEN' && (
@@ -54,19 +81,19 @@ function CenterColumn({ agents, systemState }) {
           onClick={authorizeFix}
           style={{
             width: '100%',
-            border: '1px solid #7a5d11',
+            border: '1px solid #0284c7',
             borderRadius: '10px',
             padding: '14px 16px',
             fontSize: '0.98rem',
-            fontWeight: 800,
+            fontWeight: 700,
             letterSpacing: '0.01em',
-            background: 'linear-gradient(135deg, #f0c75e 0%, #2fbf71 100%)',
-            color: '#0b1220',
+            background: '#0ea5e9',
+            color: '#ffffff',
             cursor: 'pointer',
             marginBottom: '18px',
           }}
         >
-          $ Hire Recovery Team (Bounty Authorization)
+          Fix Drift Using LLM Call
         </button>
       )}
 
