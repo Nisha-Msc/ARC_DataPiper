@@ -65,6 +65,12 @@ async function start() {
                 description: "Proof of Health"
               })
             });
+
+            await fetch('http://localhost:3001/api/internal/heartbeat', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ record: processed })
+            });
           } catch (e) {
             console.error('Error hitting Hub to trigger charge:', e.message);
           }
@@ -80,6 +86,12 @@ async function start() {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ state: "BROKEN" })
+            });
+
+            await fetch('http://localhost:3001/api/internal/drift', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ record: processed, error: "Schema Mismatch" })
             });
           } catch (e) {
             console.error('Error hitting Hub to update system state:', e.message);
