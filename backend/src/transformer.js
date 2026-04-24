@@ -3,6 +3,7 @@ const express = require('express');
 const cors = require('cors');
 const fs = require('fs');
 const Ajv = require('ajv');
+const { ethers } = require('ethers');
 const { kafka } = require('./kafka-client.js');
 
 const app = express();
@@ -16,6 +17,9 @@ const schema = JSON.parse(fs.readFileSync('./src/schemas/order-v1.json', 'utf8')
 const validateV1 = ajv.compile(schema);
 
 let currentLogic = (data) => data;
+const provider = new ethers.JsonRpcProvider(process.env.ARC_TESTNET_RPC);
+const buyerWallet = new ethers.Wallet(process.env.NANOPAY_BUYER_PRIVATE_KEY, provider);
+const nonceManager = new ethers.NonceManager(buyerWallet);
 
 app.post('/api/internal/update-logic', (req, res) => {
   try {
@@ -61,14 +65,24 @@ async function start() {
           });
           
           try {
+            const chargePayload = {
+              agent: 'Observation',
+              cost: parseFloat(process.env.HEARTBEAT_COST || 0.0001),
+              description: 'Proof of Health'
+            };
+            const payloadStr = JSON.stringify(chargePayload);
+            const tx = await nonceManager.sendTransaction({
+              to: process.env.NANOPAY_SELLER_ADDRESS,
+              value: ethers.parseEther(chargePayload.cost.toString())
+            });
+
             await fetch('http://localhost:3001/api/internal/charge', {
               method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                agent: "Observation",
-                cost: parseFloat(process.env.HEARTBEAT_COST || 0.0001),
-                description: "Proof of Health"
-              })
+              headers: {
+                'Content-Type': 'application/json',
+                'x-402-txhash': tx.hash
+              },
+              body: payloadStr
             });
 
             await fetch('http://localhost:3001/api/internal/heartbeat', {
