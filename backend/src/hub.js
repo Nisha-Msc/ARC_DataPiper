@@ -2,6 +2,7 @@ const express = require('express');
 const cors = require('cors');
 const { v4: uuidv4 } = require('uuid');
 const { OpenAI } = require('openai');
+const { ethers } = require('ethers');
 const { kafka } = require('./kafka-client.js');
 require('dotenv').config();
 
@@ -22,6 +23,11 @@ let lastKnownBadPayload = null;
 let pendingDlqCommit = null;
 let agentConsumerRef = null;
 let metrics = { processed: 0, errors: 0 };
+const provider = new ethers.JsonRpcProvider(process.env.ARC_TESTNET_RPC);
+const buyerWallet = new ethers.Wallet(process.env.NANOPAY_BUYER_PRIVATE_KEY);
+const managedBuyerWallet = new ethers.NonceManager(buyerWallet.connect(provider));
+
+const normalizeAddress = (address) => String(address || '').toLowerCase();
 
 // 2. The SSE Broadcaster
 const broadcast = (eventObj) => {
@@ -46,14 +52,15 @@ app.get('/api/stream', (req, res) => {
 });
 
 // 3. The Financial Ledger Logic
-const recordCharge = (agent, cost, description) => {
+const recordCharge = (agent, cost, description, txHash = null) => {
   totalCost += cost;
   const transaction = {
     id: uuidv4(),
     timestamp: new Date().toISOString(),
     agent,
     cost,
-    description
+    description,
+    txHash
   };
   ledger.push(transaction);
 
@@ -62,16 +69,63 @@ const recordCharge = (agent, cost, description) => {
     agent, 
     cost, 
     description, 
+    txHash,
     runningTotal: totalCost, 
     timestamp: transaction.timestamp 
   });
 };
 
+const executeAndRecordOnChainCharge = async (agent, cost, description) => {
+  const sellerAddress = process.env.NANOPAY_SELLER_ADDRESS;
+  if (!sellerAddress) {
+    throw new Error('NANOPAY_SELLER_ADDRESS is required for on-chain charging');
+  }
+
+  const tx = await managedBuyerWallet.sendTransaction({
+    to: sellerAddress,
+    value: ethers.parseEther(String(cost))
+  });
+
+  recordCharge(agent, cost, description, tx.hash);
+  return tx.hash;
+};
+
 // 4. The internal charging endpoint
-app.post('/api/internal/charge', (req, res) => {
+app.post('/api/internal/charge', async (req, res) => {
+  const txHashHeader = req.headers['x-402-txhash'];
+  const txHash = Array.isArray(txHashHeader) ? txHashHeader[0] : txHashHeader;
+
+  if (!txHash) {
+    return res.status(402).json({
+      status: 'error',
+      message: 'Payment Required: missing x-402-txhash header'
+    });
+  }
+
+  if (!ethers.isHexString(txHash, 32)) {
+    return res.status(401).json({
+      status: 'error',
+      message: 'Unauthorized: invalid x-402-txhash format'
+    });
+  }
+
+  const expectedBuyerAddress = process.env.NANOPAY_BUYER_ADDRESS;
+  const onChainTx = await provider.getTransaction(txHash).catch(() => null);
+
+  if (
+    expectedBuyerAddress &&
+    onChainTx?.from &&
+    normalizeAddress(onChainTx.from) !== normalizeAddress(expectedBuyerAddress)
+  ) {
+    return res.status(401).json({
+      status: 'error',
+      message: 'Unauthorized: tx sender is not approved buyer'
+    });
+  }
+
   const { agent, cost, description } = req.body;
-  recordCharge(agent, cost, description);
-  res.json({ status: "success" });
+  recordCharge(agent, cost, description, txHash);
+  res.json({ status: 'success', txHash });
 });
 
 app.post('/api/internal/heartbeat', (req, res) => {
@@ -131,11 +185,12 @@ const updateAgentStatus = (agent, status) => {
   broadcast({ type: 'agent_status', agent, status });
 };
 
-const recordManualInterventionAlert = (reason) => {
+const recordManualInterventionAlert = async (reason) => {
   recordCharge(
     'ALERT',
     0,
-    `Fixer patch failed verification. Manual intervention required. Reason: ${reason}`
+    `Fixer patch failed verification. Manual intervention required. Reason: ${reason}`,
+    null
   );
 };
 
@@ -146,7 +201,7 @@ const runHealingFlow = async (badPayload) => {
 
   try {
     updateAgentStatus('discovery', 'ANALYZING');
-    recordCharge(
+    await executeAndRecordOnChainCharge(
       'Discovery',
       parseFloat(process.env.DISCOVERY_COST || 0.0010),
       'Analyzed DLQ schema drift'
@@ -188,7 +243,7 @@ const runHealingFlow = async (badPayload) => {
       tokenDesc = `OpenAI API usage: ${response.usage.total_tokens} tokens utilized`;
     }
 
-    recordCharge('Fixer', actualCost, tokenDesc);
+    await executeAndRecordOnChainCharge('Fixer', actualCost, tokenDesc);
 
     const responseText = response.choices[0].message.content || '';
     let code = String(responseText)
@@ -199,8 +254,8 @@ const runHealingFlow = async (badPayload) => {
     updateAgentStatus('fixer', 'DONE');
 
     updateAgentStatus('verifier', 'AUDITING');
-    recordCharge(
-      'Verification',
+    await executeAndRecordOnChainCharge(
+      'Verifier',
       parseFloat(process.env.VERIFICATION_COST || 0.0005),
       'Smoke tested JavaScript AST'
     );
@@ -242,7 +297,7 @@ const runHealingFlow = async (badPayload) => {
     console.error('Full error:', error);
 
     if (error.code === 'VERIFICATION_REJECTED') {
-      recordManualInterventionAlert(error.message);
+      await recordManualInterventionAlert(error.message);
     }
 
     systemState = 'DEGRADED';
