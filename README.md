@@ -119,11 +119,14 @@ npm run start:pipeline
 # Manually trigger a drift to see the Stop-Loss in action
 npm run trigger:drift
 ```
-# How to run this in terminal , mention below 
-#step 1: docker-compose up -d
-#### ............loaction /ArcDataPiper/backend 
-#step 2: npm run generate-nanopay-wallets  (terminal 1) 
-#step 3: node src/hub.js (terminal 2)
-#step 4: node src/producer.js
-#step 5: npm install , npm run dev 
+# ARC_DataPiper
 
+## How to run this in terminal
+
+**Location:** `/ArcDataPiper/backend`
+
+- **Step 1:** `docker-compose up -d`
+- **Step 2:** `npm run generate-nanopay-wallets`  _(terminal 1)_
+- **Step 3:** `node src/hub.js`  _(terminal 2)_
+- **Step 4:** `node src/producer.js`
+- **Step 5:** `npm install` , `npm run dev`
