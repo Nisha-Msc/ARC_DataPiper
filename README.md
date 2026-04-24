@@ -129,5 +129,6 @@ npm run trigger:drift
 - **Step 2:** `npm run generate-nanopay-wallets`  _(terminal 1)_
 - **Step 3:** `node src/hub.js`  _(terminal 2)_
 - **Step 4:** `node src/producer.js` _(terminal 3)_
+  
 **Location:** `/ArcDataPiper/frontend`
 - **Step 5:** `npm install` , `npm run dev` _(terminal 4)_
